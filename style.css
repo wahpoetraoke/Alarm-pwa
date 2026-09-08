@@ -1,0 +1,13 @@
+*{box-sizing:border-box;font-family: system-ui, sans-serif}
+body{background:#111827;color:white;margin:0;display:flex;justify-content:center;min-height:100vh}
+.app{width:100%;max-width:420px;padding:24px}
+.clock{font-size:3rem;text-align:center;font-weight:800;margin:10px 0;letter-spacing:2px}
+.card{background:#1f2937;border-radius:16px;padding:16px;margin-top:16px}
+.form{display:flex;flex-direction:column;gap:10px}
+input{padding:12px;border-radius:10px;border:none;outline:none;font-size:16px}
+button{padding:12px;border-radius:10px;border:none;background:#6366f1;color:white;font-weight:700;font-size:16px;cursor:pointer}
+button.secondary{background:#374151;margin-top:10px;width:100%}
+.status{font-size:13px;color:#9ca3af;margin-top:8px}
+ul{list-style:none;padding:0}
+li{background:#111827;padding:12px;border-radius:10px;margin-top:10px;display:flex;justify-content:space-between;align-items:center}
+li.active{border:1px solid #6366f1}
