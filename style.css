@@ -1,1 +1,12 @@
 *{box-sizing:border-box;font-family:system-ui}body{background:#111827;color:#fff;margin:0;display:flex;justify-content:center;min-height:100vh}.app{width:100%;max-width:420px;padding:24px}.clock{font-size:3rem;text-align:center;font-weight:800}.card{background:#1f2937;border-radius:16px;padding:16px;margin-top:16px}.form{display:flex;flex-direction:column;gap:10px}input,button{padding:12px;border-radius:10px;border:none;font-size:16px}button{background:#6366f1;color:#fff;font-weight:700;cursor:pointer}button.secondary{background:#374151;margin-top:10px;width:100%}.status{font-size:13px;color:#9ca3af}ul{list-style:none;padding:0}li{background:#111827;padding:12px;border-radius:10px;margin-top:10px;display:flex;justify-content:space-between}
+
+/* FULL SCREEN ALERT 15 DETIK */
+.full-alert{position:fixed;inset:0;background:#6366f1;display:none;justify-content:center;align-items:center;z-index:99999;text-align:center;animation:flash 0.8s infinite}
+.full-alert.show{display:flex}
+.alert-box .icon{font-size:100px;animation:shake 0.3s infinite}
+#alertLabel{font-size:32px;margin:10px 0}
+#alertTime{font-size:64px;font-weight:900;margin:0}
+.countdown{margin:12px 0;opacity:0.9}
+#closeAlertBtn{margin-top:20px;background:white;color:#111827;padding:18px 40px;font-size:20px;border-radius:50px;font-weight:900}
+@keyframes shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
+@keyframes flash{0%,100%{background:#6366f1}50%{background:#4f46e5}}
