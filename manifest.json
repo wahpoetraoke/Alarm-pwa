@@ -1,17 +1,12 @@
 {
-  "name": "Alarm PWA Indonesia",
-  "short_name": "AlarmPWA",
-  "description": "Aplikasi alarm dengan notifikasi perangkat",
+  "name": "Alarm PWA",
+  "short_name": "Alarm",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#111827",
   "theme_color": "#6366f1",
   "icons": [
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }
