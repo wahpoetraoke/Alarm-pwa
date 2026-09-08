@@ -10,12 +10,26 @@
 <div class="app">
 <h1>⏰ Alarm PWA</h1>
 <p id="clock" class="clock">00:00:00</p>
-<div class="card"><h3>Atur Alarm</h3>
-<div class="form"><input type="time" id="timeInput"><input type="text" id="labelInput" placeholder="Label alarm..."><button id="setBtn">Set Alarm</button></div>
-<button id="permissionBtn" class="secondary">Aktifkan Notifikasi</button><p id="status" class="status"></p></div>
+<div class="card">
+<h3>Atur Alarm</h3>
+<div class="form"><input type="time" id="timeInput"><input type="text" id="labelInput" placeholder="Label..."><button id="setBtn">Set Alarm</button></div>
+<button id="permissionBtn" class="secondary">Aktifkan Notifikasi</button><p id="status" class="status"></p>
+</div>
 <div class="card"><h3>Daftar Alarm</h3><ul id="alarmList"></ul></div>
 </div>
-<audio id="alarmSound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+
+<!-- ALERT FULL LAYAR 15 DETIK -->
+<div id="fullAlert" class="full-alert">
+  <div class="alert-box">
+    <div class="icon">⏰</div>
+    <h1 id="alertLabel">ALARM!</h1>
+    <p id="alertTime">07:00</p>
+    <p id="countdown" class="countdown">Tutup otomatis 15 detik</p>
+    <button id="closeAlertBtn">MATIKAN ALARM</button>
+  </div>
+</div>
+
+<audio id="alarmSound" loop src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
 <script src="app.js"></script>
 </body>
 </html>
