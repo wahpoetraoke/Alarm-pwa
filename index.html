@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alarm PWA</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6366f1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <h1>⏰ Alarm PWA</h1>
+    <p id="clock" class="clock">00:00:00</p>
+    
+    <div class="card">
+      <h3>Atur Alarm Baru</h3>
+      <div class="form">
+        <input type="time" id="timeInput" required />
+        <input type="text" id="labelInput" placeholder="Label: Sholat Subuh, Kerja..." />
+        <button id="setBtn">Set Alarm</button>
+      </div>
+      <button id="permissionBtn" class="secondary">Aktifkan Notifikasi</button>
+      <p id="status" class="status"></p>
+    </div>
+
+    <div class="card">
+      <h3>Daftar Alarm</h3>
+      <ul id="alarmList"></ul>
+    </div>
+  </div>
+
+  <audio id="alarmSound" loop src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+  <script src="app.js"></script>
+</body>
+</html>
