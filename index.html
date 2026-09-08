@@ -1,35 +1,128 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Alarm PWA</title>
-<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#6366f1">
-<link rel="stylesheet" href="style.css">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Kasir Simple</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;font-family:system-ui}body{margin:0;background:#f3f4f6;padding:12px}
+.app{max-width:480px;margin:0 auto}
+.card{background:white;border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+h2{margin:0 0 10px;font-size:18px}
+input{width:100%;padding:12px;border:1px solid #e5e7eb;border-radius:10px;margin-top:6px;font-size:16px}
+.row{display:flex;gap:8px}
+.row input{flex:1}
+.btn{width:100%;padding:14px;border:none;border-radius:12px;font-weight:700;font-size:16px;cursor:pointer}
+.btn-primary{background:#111827;color:white}
+.btn-outline{background:white;border:1px solid #111827}
+.item{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px dashed #e5e7eb}
+.total{font-size:20px;font-weight:800;display:flex;justify-content:space-between;margin-top:10px}
+.struk{font-family:monospace;font-size:12px;line-height:1.4;background:white;padding:12px;white-space:pre-line}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.actions .full{grid-column:span 2}
+/* THERMAL PRINT 58mm */
+@media print{
+  body *{visibility:hidden}
+  #strukArea, #strukArea *{visibility:visible}
+  #strukArea{position:absolute;left:0;top:0;width:58mm;padding:0;margin:0}
+  .no-print{display:none}
+}
+</style>
 </head>
 <body>
 <div class="app">
-<h1>⏰ Alarm PWA</h1>
-<p id="clock" class="clock">00:00:00</p>
-<div class="card">
-<h3>Atur Alarm</h3>
-<div class="form"><input type="time" id="timeInput"><input type="text" id="labelInput" placeholder="Label..."><button id="setBtn">Set Alarm</button></div>
-<button id="permissionBtn" class="secondary">Aktifkan Notifikasi</button><p id="status" class="status"></p>
-</div>
-<div class="card"><h3>Daftar Alarm</h3><ul id="alarmList"></ul></div>
-</div>
+  <div class="card no-print">
+    <h2>🏪 Nama Toko</h2>
+    <input id="tokoName" value="TOKO WAHYU JEPARA">
+    <input id="tokoAlamat" value="Jl. Jepara - Kudus">
+  </div>
 
-<!-- ALERT FULL LAYAR 15 DETIK -->
-<div id="fullAlert" class="full-alert">
-  <div class="alert-box">
-    <div class="icon">⏰</div>
-    <h1 id="alertLabel">ALARM!</h1>
-    <p id="alertTime">07:00</p>
-    <p id="countdown" class="countdown">Tutup otomatis 15 detik</p>
-    <button id="closeAlertBtn">MATIKAN ALARM</button>
+  <div class="card no-print">
+    <h2>Tambah Barang</h2>
+    <input id="namaBarang" placeholder="Nama barang">
+    <div class="row">
+      <input id="hargaBarang" type="number" placeholder="Harga">
+      <input id="qtyBarang" type="number" value="1" placeholder="Qty">
+    </div>
+    <button class="btn btn-primary" style="margin-top:8px" onclick="tambahBarang()">+ Tambah ke Keranjang</button>
+  </div>
+
+  <div class="card no-print">
+    <h2>Keranjang</h2>
+    <div id="listKeranjang"><small style="opacity:0.5">Kosong</small></div>
+    <div class="total"><span>Total</span><span id="totalTxt">Rp 0</span></div>
+    <input id="bayarInput" type="number" placeholder="Bayar pelanggan" style="margin-top:10px">
+    <div class="total" style="font-size:16px"><span>Kembalian</span><span id="kembaliTxt">Rp 0</span></div>
+  </div>
+
+  <div class="card">
+    <h2 class="no-print">Preview Struk</h2>
+    <div id="strukArea" class="struk">Belum ada transaksi</div>
+    <div class="actions no-print">
+      <button class="btn btn-primary full" onclick="cetakThermal()">🖨️ Cetak Thermal 58mm</button>
+      <button class="btn btn-outline" onclick="saveGambar()">🖼️ Simpan Gambar</button>
+      <button class="btn btn-outline" onclick="savePDF()">📄 Simpan PDF</button>
+      <button class="btn btn-outline full" style="background:#fee2e2" onclick="resetAll()">Reset</button>
+    </div>
   </div>
 </div>
 
-<audio id="alarmSound" loop src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
-<script src="app.js"></script>
+<script>
+let keranjang=[];
+const fmt = n => 'Rp '+Number(n).toLocaleString('id-ID');
+function tambahBarang(){
+  const nama=document.getElementById('namaBarang').value;
+  const harga=parseInt(document.getElementById('hargaBarang').value)||0;
+  const qty=parseInt(document.getElementById('qtyBarang').value)||1;
+  if(!nama||!harga)return alert('Isi nama & harga');
+  keranjang.push({nama,harga,qty});
+  document.getElementById('namaBarang').value='';document.getElementById('hargaBarang').value='';
+  render();
+}
+function render(){
+  let total=0; let html='';
+  keranjang.forEach((b,i)=>{
+    const sub=b.harga*b.qty; total+=sub;
+    html+=`<div class="item"><div>${b.nama} x${b.qty}<br><small>${fmt(b.harga)}</small></div><div>${fmt(sub)} <a href="#" onclick="hapus(${i})">❌</a></div></div>`;
+  });
+  document.getElementById('listKeranjang').innerHTML=html||'<small style="opacity:0.5">Kosong</small>';
+  document.getElementById('totalTxt').textContent=fmt(total);
+  const bayar=parseInt(document.getElementById('bayarInput').value)||0;
+  document.getElementById('kembaliTxt').textContent=fmt(bayar-total);
+  buatStruk(total,bayar);
+}
+function buatStruk(total,bayar){
+  const toko=document.getElementById('tokoName').value;
+  const alamat=document.getElementById('tokoAlamat').value;
+  const tgl=new Date().toLocaleString('id-ID');
+  let isi=`${toko}\n${alamat}\n${tgl}\n------------------------------\n`;
+  keranjang.forEach(b=>{ isi+=`${b.nama}\n ${b.qty} x ${fmt(b.harga)} = ${fmt(b.harga*b.qty)}\n`; });
+  isi+=`------------------------------\nTOTAL: ${fmt(total)}\nBAYAR: ${fmt(bayar)}\nKEMBALI: ${fmt(bayar-total)}\n------------------------------\nTerima kasih!\n`;
+  document.getElementById('strukArea').textContent=isi;
+}
+document.getElementById('bayarInput').addEventListener('input',render);
+document.getElementById('tokoName').addEventListener('input',render);
+function hapus(i){keranjang.splice(i,1);render();}
+function resetAll(){if(confirm('Reset semua?')){keranjang=[];render();}}
+
+function cetakThermal(){ window.print(); }
+
+async function saveGambar(){
+  const el=document.getElementById('strukArea');
+  const canvas=await html2canvas(el,{scale:3,backgroundColor:'#fff'});
+  const link=document.createElement('a'); link.download='struk-'+Date.now()+'.jpg'; link.href=canvas.toDataURL('image/jpeg',0.9); link.click();
+}
+async function savePDF(){
+  const {jsPDF}=window.jspdf;
+  const el=document.getElementById('strukArea');
+  const canvas=await html2canvas(el,{scale:3});
+  const img=canvas.toDataURL('image/png');
+  const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:[58, 150]});
+  const w=58; const h=(canvas.height/canvas.width)*w;
+  pdf.addImage(img,'PNG',0,0,w,h);
+  pdf.save('struk-'+Date.now()+'.pdf');
+}
+</script>
 </body>
 </html>
