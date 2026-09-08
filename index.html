@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Kasir Simple</title>
+<link rel="manifest" href="manifest.json">
+<meta name="description" content="Aplikasi kasir mobile untuk cetak struk thermal 58mm, simpan jadi gambar dan PDF">
+<meta name="theme-color" content="#111827">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -21,7 +24,6 @@ input{width:100%;padding:12px;border:1px solid #e5e7eb;border-radius:10px;margin
 .struk{font-family:monospace;font-size:12px;line-height:1.4;background:white;padding:12px;white-space:pre-line}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .actions .full{grid-column:span 2}
-/* THERMAL PRINT 58mm */
 @media print{
   body *{visibility:hidden}
   #strukArea, #strukArea *{visibility:visible}
@@ -37,7 +39,6 @@ input{width:100%;padding:12px;border:1px solid #e5e7eb;border-radius:10px;margin
     <input id="tokoName" value="TOKO WAHYU JEPARA">
     <input id="tokoAlamat" value="Jl. Jepara - Kudus">
   </div>
-
   <div class="card no-print">
     <h2>Tambah Barang</h2>
     <input id="namaBarang" placeholder="Nama barang">
@@ -47,7 +48,6 @@ input{width:100%;padding:12px;border:1px solid #e5e7eb;border-radius:10px;margin
     </div>
     <button class="btn btn-primary" style="margin-top:8px" onclick="tambahBarang()">+ Tambah ke Keranjang</button>
   </div>
-
   <div class="card no-print">
     <h2>Keranjang</h2>
     <div id="listKeranjang"><small style="opacity:0.5">Kosong</small></div>
@@ -55,7 +55,6 @@ input{width:100%;padding:12px;border:1px solid #e5e7eb;border-radius:10px;margin
     <input id="bayarInput" type="number" placeholder="Bayar pelanggan" style="margin-top:10px">
     <div class="total" style="font-size:16px"><span>Kembalian</span><span id="kembaliTxt">Rp 0</span></div>
   </div>
-
   <div class="card">
     <h2 class="no-print">Preview Struk</h2>
     <div id="strukArea" class="struk">Belum ada transaksi</div>
@@ -67,7 +66,6 @@ input{width:100%;padding:12px;border:1px solid #e5e7eb;border-radius:10px;margin
     </div>
   </div>
 </div>
-
 <script>
 let keranjang=[];
 const fmt = n => 'Rp '+Number(n).toLocaleString('id-ID');
@@ -105,9 +103,7 @@ document.getElementById('bayarInput').addEventListener('input',render);
 document.getElementById('tokoName').addEventListener('input',render);
 function hapus(i){keranjang.splice(i,1);render();}
 function resetAll(){if(confirm('Reset semua?')){keranjang=[];render();}}
-
 function cetakThermal(){ window.print(); }
-
 async function saveGambar(){
   const el=document.getElementById('strukArea');
   const canvas=await html2canvas(el,{scale:3,backgroundColor:'#fff'});
@@ -123,6 +119,7 @@ async function savePDF(){
   pdf.addImage(img,'PNG',0,0,w,h);
   pdf.save('struk-'+Date.now()+'.pdf');
 }
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js'); }
 </script>
 </body>
 </html>
