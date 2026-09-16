@@ -2,7 +2,8 @@
   "name": "telegrambit",
   "type": "module",
   "dependencies": {
-    "telegraf": "^4.15.0",
-    "@neondatabase/serverless": "^0.9.5"
+    "@neondatabase/serverless": "^0.9.5",
+    "pdf-lib": "^1.17.1",
+    "jimp": "^0.22.12"
   }
 }
