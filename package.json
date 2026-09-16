@@ -3,7 +3,6 @@
   "type": "module",
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",
-    "pdf-lib": "^1.17.1",
-    "jimp": "^0.22.12"
+    "pdf-lib": "^1.17.1"
   }
 }
