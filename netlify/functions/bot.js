@@ -25,41 +25,56 @@ async function sendDoc(chatId, buffer, filename){
   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`,{method:'POST', body: fd});
 }
 
+// Parser: Indomie 2 5000 -> {name, qty, price}
+function parseKetikBebas(text){
+  const lines = text.split('\n').filter(l=>l.trim());
+  const items = [];
+  for(const line of lines){
+    // hapus /pesan kalau ada
+    const clean = line.replace('/pesan','').trim();
+    // regex: ambil 2 angka di akhir
+    const m = clean.match(/^(.+?)\s+(\d+)\s+(\d+)$/);
+    if(m){
+      items.push({ name: m[1].trim(), qty: parseInt(m[2]), price: parseInt(m[3]) });
+    }
+  }
+  return items;
+}
+
 async function generateReceiptImage(items, total){
-  const W = 400, lineH = 28, H = 200 + items.length*lineH;
+  const W=400, H=250+items.length*50;
   const img = new Jimp(W, H, 0xffffffff);
   const font = await Jimp.loadFont(Jimp.FONT_SANS_16_BLACK);
   const fontBold = await Jimp.loadFont(Jimp.FONT_SANS_32_BLACK);
-  let y = 20;
-  img.print(fontBold, 10, y, {text:'WARUNG PASANG INTERNET', alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER}, W-20);
-  y+=45;
-  img.print(font, 10, y, {text:'Bandar Lampung - '+new Date().toLocaleString('id-ID'), alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER}, W-20);
-  y+=30;
+  const fontSmall = await Jimp.loadFont(Jimp.FONT_SANS_12_BLACK);
+  let y=20;
+  img.print(fontBold, 10, y, {text:'STRUK BELANJA', alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER}, W-20); y+=45;
+  img.print(fontSmall, 10, y, {text: new Date().toLocaleString('id-ID'), alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER}, W-20); y+=25;
   img.print(font, 10, y, '----------------------------------------'); y+=25;
   items.forEach(it=>{
-    img.print(font, 10, y, `${it.name} ${it.qty}x Rp${it.price}`);
-    img.print(font, 10, y+16, ` = Rp${it.price*it.qty}`);
-    y+=35;
+    img.print(font, 10, y, `${it.name}`);
+    y+=18;
+    img.print(font, 10, y, `${it.qty} x Rp${it.price} = Rp${it.qty*it.price}`);
+    y+=30;
   });
   img.print(font, 10, y, '----------------------------------------'); y+=25;
-  img.print(fontBold, 10, y, `TOTAL: Rp${total}`); y+=40;
-  img.print(font, 10, y, 'Terima kasih!');
+  img.print(fontBold, 10, y, `TOTAL: Rp${total}`);
   return await img.getBufferAsync(Jimp.MIME_JPEG);
 }
 
-async function generateReceiptPdf(items, total, orderId){
+async function generateReceiptPdf(items, total){
   const pdf = await PDFDocument.create();
-  const page = pdf.addPage([300, 400+items.length*20]);
+  const page = pdf.addPage([350, 300+items.length*25]);
   const font = await pdf.embedFont(StandardFonts.Courier);
-  let y = 380;
-  page.drawText(`STRUK #${orderId}`, {x:10, y, size:14, font}); y-=20;
-  page.drawText(`Warung Pasang Internet`, {x:10, y, size:10, font}); y-=15;
-  page.drawText(`------------------------------`, {x:10, y, size:10, font}); y-=15;
+  let y=280+items.length*25;
+  page.drawText('STRUK BELANJA', {x:10, y, size:14, font}); y-=20;
+  page.drawText(new Date().toLocaleString('id-ID'), {x:10, y, size:8, font}); y-=15;
+  page.drawText('------------------------------', {x:10, y, size:10, font}); y-=15;
   items.forEach(it=>{
-    page.drawText(`${it.name} ${it.qty}x${it.price} = ${it.qty*it.price}`, {x:10, y, size:9, font}); y-=12;
+    page.drawText(`${it.name}`, {x:10, y, size:10, font}); y-=12;
+    page.drawText(` ${it.qty} x ${it.price} = ${it.qty*it.price}`, {x:10, y, size:10, font}); y-=15;
   });
-  y-=5;
-  page.drawText(`------------------------------`, {x:10, y, size:10, font}); y-=15;
+  page.drawText('------------------------------', {x:10, y, size:10, font}); y-=15;
   page.drawText(`TOTAL: Rp${total}`, {x:10, y, size:12, font});
   return await pdf.save();
 }
@@ -69,54 +84,45 @@ export const handler = async (event) => {
     const body = event.isBase64Encoded? Buffer.from(event.body,'base64').toString(): event.body;
     const update = JSON.parse(body);
     const msg = update.message; if(!msg?.text) return {statusCode:200, body:'ok'};
-    const chatId = msg.chat.id; const userId = msg.from.id; const text = msg.text.trim();
+    const chatId = msg.chat.id; const text = msg.text.trim();
 
-    if(text.startsWith('/menu')){
-      const menus = await sql`SELECT * FROM menus ORDER BY id`;
-      let t = '*MENU:*\n'; menus.forEach(m=> t+=`${m.id}. ${m.name} - Rp${m.price}\n`);
-      t+=`\nCara pesan: /pesan 1x2 2x1`;
-      await sendMessage(chatId, t);
-    }
-    else if(text.startsWith('/pesan')){
-      // format: /pesan 1x2 3x1
-      const parts = text.replace('/pesan','').trim().split(' ');
-      for(const p of parts){
-        const [idStr, qtyStr] = p.split('x'); const id=parseInt(idStr); const qty=parseInt(qtyStr||1);
-        const m = (await sql`SELECT * FROM menus WHERE id=${id}`)[0];
-        if(!m) continue;
-        await sql`INSERT INTO carts(user_id, menu_id, name, price, qty) VALUES(${userId}, ${id}, ${m.name}, ${m.price}, ${qty})
-          ON CONFLICT(user_id, menu_id) DO UPDATE SET qty = carts.qty + ${qty}`;
-      }
-      await sendMessage(chatId, '✅ Masuk keranjang. Cek /keranjang');
-    }
-    else if(text.startsWith('/keranjang')){
-      const carts = await sql`SELECT * FROM carts WHERE user_id=${userId}`;
-      if(!carts.length) return await sendMessage(chatId, 'Keranjang kosong');
-      let total=0; let t='*KERANJANG:*\n'; carts.forEach(c=>{ const sub=c.price*c.qty; total+=sub; t+=`${c.name} ${c.qty}x Rp${c.price} = Rp${sub}\n`; });
-      t+=`\n*TOTAL: Rp${total}*\nKetik /checkout untuk cetak struk`;
-      await sendMessage(chatId, t);
-    }
-    else if(text.startsWith('/checkout')){
-      const carts = await sql`SELECT * FROM carts WHERE user_id=${userId}`;
-      if(!carts.length) return await sendMessage(chatId, 'Keranjang kosong');
-      let total=0; carts.forEach(c=> total+=c.price*c.qty);
-      const order = (await sql`INSERT INTO orders(user_id, total) VALUES(${userId}, ${total}) RETURNING id`)[0];
-      for(const c of carts){
-        await sql`INSERT INTO order_items(order_id, menu_id, name, price, qty) VALUES(${order.id}, ${c.menu_id}, ${c.name}, ${c.price}, ${c.qty})`;
-      }
-      await sql`DELETE FROM carts WHERE user_id=${userId}`;
+    if(text.startsWith('/start')){
+      await sendMessage(chatId,
+`Ketik bebas kayak gini boy, langsung jadi struk:
 
-      // Generate struk
-      const imgBuf = await generateReceiptImage(carts, total);
-      const pdfBuf = await generateReceiptPdf(carts, total, order.id);
+\`\`\`
+Indomie 2 5000
+Bakso 3 4000
+Es gooday 3 4000
+\`\`\`
+Format: NAMA QTY HARGA_SATUAN
 
-      await sendPhoto(chatId, imgBuf, `Struk #${order.id} - TOTAL Rp${total}`);
-      await sendDoc(chatId, pdfBuf, `struk-${order.id}.pdf`);
-      await sendMessage(chatId, `✅ Order #${order.id} selesai. Total Rp${total}`);
+Bot auto hitung total + kirim gambar & PDF struk.`);
+      return {statusCode:200, body:'ok'};
     }
-    else if(text.startsWith('/start')){
-      await sendMessage(chatId, 'Halo! /menu untuk lihat makanan, /pesan 1x2 2x1, /keranjang, /checkout');
+
+    const items = parseKetikBebas(text);
+    if(items.length===0) return {statusCode:200, body:'ok'};
+
+    let total=0;
+    items.forEach(i=> total+= i.qty * i.price);
+
+    // Simpan ke DB
+    const order = (await sql`INSERT INTO orders(user_id, total) VALUES(${msg.from.id}, ${total}) RETURNING id`)[0];
+    for(const it of items){
+      await sql`INSERT INTO order_items(order_id, name, price, qty) VALUES(${order.id}, ${it.name}, ${it.price}, ${it.qty})`;
     }
+
+    const imgBuf = await generateReceiptImage(items, total);
+    const pdfBuf = await generateReceiptPdf(items, total);
+
+    let reply = `*Rincian:*\n`;
+    items.forEach(it=> reply+=`${it.name} ${it.qty}x Rp${it.price} = Rp${it.qty*it.price}\n`);
+    reply+=`\n*TOTAL: Rp${total}*`;
+    await sendMessage(chatId, reply);
+    await sendPhoto(chatId, imgBuf, `Struk #${order.id} - Total Rp${total}`);
+    await sendDoc(chatId, pdfBuf, `struk-${order.id}.pdf`);
+
   }catch(e){ console.error(e); }
   return {statusCode:200, body:'ok'};
 };
