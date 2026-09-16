@@ -25,15 +25,14 @@ async function sendDoc(chatId, buffer, filename){
   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`,{method:'POST', body: fd});
 }
 
-// Parser: Indomie 2 5000 -> {name, qty, price}
 function parseKetikBebas(text){
   const lines = text.split('\n').filter(l=>l.trim());
   const items = [];
   for(const line of lines){
-    // hapus /pesan kalau ada
-    const clean = line.replace('/pesan','').trim();
-    // regex: ambil 2 angka di akhir
-    const m = clean.match(/^(.+?)\s+(\d+)\s+(\d+)$/);
+    const clean = line.replace('/pesan','').replace('/add','').trim();
+    if(!clean) continue;
+    // format: Nama 2 5000  atau Nama 2x 5000
+    const m = clean.match(/^(.+?)\s+(\d+)x?\s+(\d+)$/i);
     if(m){
       items.push({ name: m[1].trim(), qty: parseInt(m[2]), price: parseInt(m[3]) });
     }
@@ -42,7 +41,7 @@ function parseKetikBebas(text){
 }
 
 async function generateReceiptImage(items, total){
-  const W=400, H=250+items.length*50;
+  const W=420, H=280+items.length*55;
   const img = new Jimp(W, H, 0xffffffff);
   const font = await Jimp.loadFont(Jimp.FONT_SANS_16_BLACK);
   const fontBold = await Jimp.loadFont(Jimp.FONT_SANS_32_BLACK);
@@ -54,7 +53,7 @@ async function generateReceiptImage(items, total){
   items.forEach(it=>{
     img.print(font, 10, y, `${it.name}`);
     y+=18;
-    img.print(font, 10, y, `${it.qty} x Rp${it.price} = Rp${it.qty*it.price}`);
+    img.print(font, 10, y, `  ${it.qty} x Rp${it.price} = Rp${it.qty*it.price}`);
     y+=30;
   });
   img.print(font, 10, y, '----------------------------------------'); y+=25;
@@ -62,12 +61,13 @@ async function generateReceiptImage(items, total){
   return await img.getBufferAsync(Jimp.MIME_JPEG);
 }
 
-async function generateReceiptPdf(items, total){
+async function generateReceiptPdf(items, total, orderId){
   const pdf = await PDFDocument.create();
-  const page = pdf.addPage([350, 300+items.length*25]);
+  const page = pdf.addPage([360, 320+items.length*28]);
   const font = await pdf.embedFont(StandardFonts.Courier);
-  let y=280+items.length*25;
-  page.drawText('STRUK BELANJA', {x:10, y, size:14, font}); y-=20;
+  let y=300+items.length*28;
+  page.drawText(`STRUK #${orderId}`, {x:10, y, size:14, font}); y-=20;
+  page.drawText(`Pasanginternetbot`, {x:10, y, size:10, font}); y-=12;
   page.drawText(new Date().toLocaleString('id-ID'), {x:10, y, size:8, font}); y-=15;
   page.drawText('------------------------------', {x:10, y, size:10, font}); y-=15;
   items.forEach(it=>{
@@ -83,46 +83,65 @@ export const handler = async (event) => {
   try{
     const body = event.isBase64Encoded? Buffer.from(event.body,'base64').toString(): event.body;
     const update = JSON.parse(body);
-    const msg = update.message; if(!msg?.text) return {statusCode:200, body:'ok'};
-    const chatId = msg.chat.id; const text = msg.text.trim();
+    const msg = update.message; 
+    if(!msg?.text) return {statusCode:200, body:'ok'};
+    const chatId = msg.chat.id; 
+    const userId = msg.from.id; 
+    const text = msg.text.trim();
 
+    // 1. START
     if(text.startsWith('/start')){
       await sendMessage(chatId,
-`Ketik bebas kayak gini boy, langsung jadi struk:
+`*Bot Hidup!*
 
+Cara pakai baru (ketik bebas):
 \`\`\`
-Indomie 2 5000
-Bakso 3 4000
-Es gooday 3 4000
+Bakso 5 2000
+Es Susu 4 5000
 \`\`\`
-Format: NAMA QTY HARGA_SATUAN
+Format: NAMA QTY HARGA
 
-Bot auto hitung total + kirim gambar & PDF struk.`);
+Perintah lama masih bisa:
+/add pedro
+/list
+`);
       return {statusCode:200, body:'ok'};
     }
 
-    const items = parseKetikBebas(text);
-    if(items.length===0) return {statusCode:200, body:'ok'};
-
-    let total=0;
-    items.forEach(i=> total+= i.qty * i.price);
-
-    // Simpan ke DB
-    const order = (await sql`INSERT INTO orders(user_id, total) VALUES(${msg.from.id}, ${total}) RETURNING id`)[0];
-    for(const it of items){
-      await sql`INSERT INTO order_items(order_id, name, price, qty) VALUES(${order.id}, ${it.name}, ${it.price}, ${it.qty})`;
+    // 2. Cek format ketik bebas dulu: Bakso 5 2000
+    const customItems = parseKetikBebas(text);
+    if(customItems.length > 0 && !text.startsWith('/add')){
+      let total=0; customItems.forEach(i=> total+= i.qty*i.price);
+      // buat tabel kalau belum ada
+      await sql`CREATE TABLE IF NOT EXISTS orders(id SERIAL PRIMARY KEY, user_id BIGINT, total INT, created_at TIMESTAMP DEFAULT NOW())`;
+      await sql`CREATE TABLE IF NOT EXISTS order_items(id SERIAL PRIMARY KEY, order_id INT, name TEXT, price INT, qty INT)`;
+      const order = (await sql`INSERT INTO orders(user_id, total) VALUES(${userId}, ${total}) RETURNING id`)[0];
+      for(const it of customItems){
+        await sql`INSERT INTO order_items(order_id, name, price, qty) VALUES(${order.id}, ${it.name}, ${it.price}, ${it.qty})`;
+      }
+      let reply=`*Rincian:*\n`;
+      customItems.forEach(it=> reply+=`${it.name} ${it.qty}x Rp${it.price} = Rp${it.qty*it.price}\n`);
+      reply+=`\n*TOTAL: Rp${total}*`;
+      await sendMessage(chatId, reply);
+      const imgBuf = await generateReceiptImage(customItems, total);
+      const pdfBuf = await generateReceiptPdf(customItems, total, order.id);
+      await sendPhoto(chatId, imgBuf, `Struk #${order.id} - Rp${total}`);
+      await sendDoc(chatId, pdfBuf, `struk-${order.id}.pdf`);
+      return {statusCode:200, body:'ok'};
     }
 
-    const imgBuf = await generateReceiptImage(items, total);
-    const pdfBuf = await generateReceiptPdf(items, total);
+    // 3. Perintah lama /add /list biar gak diem
+    await sql`CREATE TABLE IF NOT EXISTS items(id SERIAL PRIMARY KEY, user_id BIGINT, title TEXT, created_at TIMESTAMP DEFAULT NOW())`;
+    if(text.startsWith('/add ')){
+      const title = text.replace('/add','').trim();
+      const r = await sql`INSERT INTO items(user_id, title) VALUES(${userId}, ${title}) RETURNING id`;
+      await sendMessage(chatId, `✅ ID ${r[0].id} kesimpen`);
+    } else if(text.startsWith('/list')){
+      const rows = await sql`SELECT id, title FROM items WHERE user_id=${userId} ORDER BY id DESC LIMIT 20`;
+      if(rows.length==0) await sendMessage(chatId, 'Kosong, /add dulu');
+      else await sendMessage(chatId, rows.map(x=>`${x.id}. ${x.title}`).join('\n'));
+    }
 
-    let reply = `*Rincian:*\n`;
-    items.forEach(it=> reply+=`${it.name} ${it.qty}x Rp${it.price} = Rp${it.qty*it.price}\n`);
-    reply+=`\n*TOTAL: Rp${total}*`;
-    await sendMessage(chatId, reply);
-    await sendPhoto(chatId, imgBuf, `Struk #${order.id} - Total Rp${total}`);
-    await sendDoc(chatId, pdfBuf, `struk-${order.id}.pdf`);
-
-  }catch(e){ console.error(e); }
+  }catch(e){ console.error('ERROR:', e); }
   return {statusCode:200, body:'ok'};
 };
